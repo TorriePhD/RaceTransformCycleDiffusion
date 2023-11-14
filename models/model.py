@@ -71,7 +71,7 @@ class Palette(BaseModel):
         self.gt_image_copy = self.set_device(data.get('gt_image'))
         self.path = data['path']
         self.batch_size = len(data['path'])
-        self.direction = data['direction']
+        self.direction = data['direction'][0]
         print("direction ", self.direction)
     
     def get_current_visuals(self, phase='train'):

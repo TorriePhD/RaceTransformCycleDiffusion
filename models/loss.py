@@ -69,7 +69,9 @@ class RaceTransformCycleDiffusionLossModel(nn.Module):
     def forward(self, output, target, direction=0):
         outputEmbedding = self.resnet50(output)
         targetEmbedding = self.resnet50(target)
+        print(f'outputEmbedding.shape: {outputEmbedding.shape},output.shape: {output.shape},targetEmbedding.shape: {targetEmbedding.shape},target.shape: {target.shape}')
         loss = contrastive_loss(outputEmbedding, targetEmbedding,direction=direction)
+        print(f"contrastive_loss: {loss}")
         return loss
 if __name__ == "__main__":
     output = torch.randn(4, 2048, 1, 1)
