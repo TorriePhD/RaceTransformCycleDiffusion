@@ -14,12 +14,13 @@ from torchvision import models
 
 def mse_loss(output, target):
     return F.mse_loss(output, target)
-def contrastive_loss(output, target):
+def contrastive_loss(output, target,direction=0):
     output = output.squeeze()
     target = target.squeeze()
 
     euclidean_distance = F.pairwise_distance(output, target, keepdim = True)
-    loss_contrastive = torch.mean(torch.pow(euclidean_distance, 2))
+    loss_contrastive = torch.mean((1-direction) * torch.pow(euclidean_distance, 2) +
+                                  (direction) * torch.pow(torch.clamp(2 - euclidean_distance, min=0.0), 2))
     return loss_contrastive
     
 class FocalLoss(nn.Module):
@@ -65,12 +66,10 @@ class RaceTransformCycleDiffusionLossModel(nn.Module):
             param.requires_grad = False
         self.resnet50.to(device)
         
-    def forward(self, output, target):
+    def forward(self, output, target, direction=0):
         outputEmbedding = self.resnet50(output)
         targetEmbedding = self.resnet50(target)
-        print(f'outputEmbedding.shape: {outputEmbedding.shape},output.shape: {output.shape},targetEmbedding.shape: {targetEmbedding.shape},target.shape: {target.shape}')
-        loss = contrastive_loss(outputEmbedding, targetEmbedding)
-        print(f"contrastive_loss: {loss}")
+        loss = contrastive_loss(outputEmbedding, targetEmbedding,direction=direction)
         return loss
 if __name__ == "__main__":
     output = torch.randn(4, 2048, 1, 1)

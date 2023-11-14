@@ -62,8 +62,8 @@ class Palette(BaseModel):
         self.sample_num = sample_num
         self.task = task
         self.perceptualLossModel = RaceTransformCycleDiffusionLossModel()
-    def perceptual_loss(self, x, y):
-        return self.perceptualLossModel(x, y)
+    def perceptual_loss(self, x, y, direction=0):
+        return self.perceptualLossModel(x, y,direction=direction)
     def set_input(self, data):
         ''' must use set_device in tensor '''
         self.cond_image = self.set_device(data.get('cond_image'))
@@ -111,15 +111,17 @@ class Palette(BaseModel):
         for train_data in tqdm.tqdm(self.phase_loader):
             self.set_input(train_data)
             self.optG.zero_grad()
-            if self.direction == 'B':
+            if self.direction == 'A':
                 _ = self.netG(self.gt_image, None, mask=None)
                 loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
                 loss += self.netH(self.gt_image, self.cond_image, mask=None)
+                loss +=self.perceptual_loss(self.gt_image,self.gt_image_copy, direction=1)
                 print(loss)
             else:
                 _ = self.netH(self.gt_image, None, mask=None)
                 loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
                 loss += self.netG(self.gt_image, self.cond_image, mask=None)
+                loss += self.perceptual_loss(self.gt_image,self.gt_image_copy, direction=1)
                 print("loss B ", loss)
 
 

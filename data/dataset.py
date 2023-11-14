@@ -209,6 +209,7 @@ class RaceTransformDataset(data.Dataset):
 
 from torch.utils.data import Sampler
 import random
+
 class CustomBatchSampler(Sampler):
     def __init__(self, data_source, batch_size):
         self.data_source = data_source
@@ -217,27 +218,35 @@ class CustomBatchSampler(Sampler):
         self.A_indices = [i for i, _ in enumerate(data_source) if data_source[i]['direction'] == 'A']
         self.B_indices = [i for i, _ in enumerate(data_source) if data_source[i]['direction'] == 'B']
 
+    def _generate_batches(self, indices):
+        # Generate batches for a given set of indices
+        return [indices[i:i + self.batch_size] for i in range(0, len(indices), self.batch_size)]
+
     def __iter__(self):
-        # Shuffle the indices if necessary
+        # Shuffle the indices
         random.shuffle(self.A_indices)
         random.shuffle(self.B_indices)
 
-        # Yield batches ensuring that each batch contains only one direction
-        for i in range(0, len(self.A_indices), self.batch_size):
-            yield self.A_indices[i:i + self.batch_size]
-        for i in range(0, len(self.B_indices), self.batch_size):
-            yield self.B_indices[i:i + self.batch_size]
+        # Create batches for each direction
+        A_batches = self._generate_batches(self.A_indices)
+        B_batches = self._generate_batches(self.B_indices)
+
+        # Combine and shuffle the batches
+        combined_batches = A_batches + B_batches
+        random.shuffle(combined_batches)
+
+        # Yield interleaved batches
+        for batch in combined_batches:
+            yield batch
 
     def __len__(self):
         # Calculate the number of batches
         return (len(self.A_indices) + len(self.B_indices)) // self.batch_size
 
 
+
+
 if __name__=="__main__":
     raceTransform = RaceTransformDataset("/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImages")
-    print(len(raceTransform))
-    # for i in range(len(raceTransform)):
-    #     data = raceTransform[i]
-    #     print(data['path'],data['direction'],data['gt_image'].shape)
-    data = raceTransform[-1]
-    print(data['path'],data['direction'],data['gt_image'].shape)
+    sampler = CustomBatchSampler(raceTransform, 32)
+    print(sampler[0])

@@ -25,11 +25,17 @@ def define_dataloader(logger, opt):
     data_sampler = CustomBatchSampler(phase_dataset, batch_size=dataloader_args.get('batch_size', 1) )
     val_dataSampler = CustomBatchSampler(val_dataset, batch_size=dataloader_args.get('batch_size', 1) )
     ''' create dataloader and validation dataloader '''
-    dataloader = DataLoader(phase_dataset, sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args)
+    #remove batch_size, shuffle, sampler, and drop_last from dataloader_args
+    dataloader_args.pop('batch_size', None)
+    dataloader_args.pop('shuffle', None)
+    dataloader_args.pop('sampler', None)
+    dataloader_args.pop('drop_last', None)
+    
+    dataloader = DataLoader(phase_dataset, batch_sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args)
     ''' val_dataloader don't use DistributedSampler to run only GPU 0! '''
     if opt['global_rank']==0 and val_dataset is not None:
         dataloader_args.update(opt['datasets'][opt['phase']]['dataloader'].get('val_args',{}))
-        val_dataloader = DataLoader(val_dataset, sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args) 
+        val_dataloader = DataLoader(val_dataset, batch_sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args) 
     else:
         val_dataloader = None
     return dataloader, val_dataloader
