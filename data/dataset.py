@@ -175,13 +175,14 @@ class ColorizationDataset(data.Dataset):
 
 
 class RaceTransformDataset(data.Dataset):
-    def __init__(self, data_root, data_flist, data_len=-1, image_size=[224, 224], loader=pil_loader,races=["White","Black"]):#["White","Black","Asian","Indian"]):
-        self.data_root = data_root
-        flist = make_dataset(data_flist)
+   def __init__(self, data_root, mask_config={}, data_len=-1, image_size=[160, 160], loader=pil_loader,races=['African','Asian']):#,'Caucasian','Indian']):
+        imgs = []
+        for i in races:
+            imgs += make_dataset(os.path.join(data_root,i))
         if data_len > 0:
-            self.flist = flist[:int(data_len)]
+            self.imgs = imgs[:int(data_len)]
         else:
-            self.flist = flist
+            self.imgs = imgs
         self.tfs = transforms.Compose([
                 transforms.Resize((image_size[0], image_size[1])),
                 transforms.ToTensor(),
@@ -189,19 +190,54 @@ class RaceTransformDataset(data.Dataset):
         ])
         self.loader = loader
         self.image_size = image_size
+        self.races = races
 
-    def __getitem__(self, index):
+   def __getitem__(self, index):
         ret = {}
-        file_name = str(self.flist[index]).zfill(5) + '.png'
-
-        img = self.tfs(self.loader('{}/{}/{}'.format(self.data_root, 'color', file_name)))
-        cond_image = self.tfs(self.loader('{}/{}/{}'.format(self.data_root, 'gray', file_name)))
+        path = self.imgs[index]
+        img = self.tfs(self.loader(path))
 
         ret['gt_image'] = img
-        ret['cond_image'] = cond_image
-        ret['path'] = file_name
+        ret["cond_image"] = img.clone()
+        ret['path'] = path.rsplit("/")[-1].rsplit("\\")[-1]
+        race = path.rsplit("/")[-2].rsplit("\\")[-1]
+        ret['direction'] = "A" if race ==self.races[0] else "B"
         return ret
 
-    def __len__(self):
-        return len(self.flist)
+   def __len__(self):
+        return len(self.imgs)
 
+from torch.utils.data import Sampler
+import random
+class CustomBatchSampler(Sampler):
+    def __init__(self, data_source, batch_size):
+        self.data_source = data_source
+        self.batch_size = batch_size
+        # Organize indices by direction
+        self.A_indices = [i for i, _ in enumerate(data_source) if data_source[i]['direction'] == 'A']
+        self.B_indices = [i for i, _ in enumerate(data_source) if data_source[i]['direction'] == 'B']
+
+    def __iter__(self):
+        # Shuffle the indices if necessary
+        random.shuffle(self.A_indices)
+        random.shuffle(self.B_indices)
+
+        # Yield batches ensuring that each batch contains only one direction
+        for i in range(0, len(self.A_indices), self.batch_size):
+            yield self.A_indices[i:i + self.batch_size]
+        for i in range(0, len(self.B_indices), self.batch_size):
+            yield self.B_indices[i:i + self.batch_size]
+
+    def __len__(self):
+        # Calculate the number of batches
+        return (len(self.A_indices) + len(self.B_indices)) // self.batch_size
+
+
+if __name__=="__main__":
+    raceTransform = RaceTransformDataset("/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImages")
+    print(len(raceTransform))
+    # for i in range(len(raceTransform)):
+    #     data = raceTransform[i]
+    #     print(data['path'],data['direction'],data['gt_image'].shape)
+    data = raceTransform[-1]
+    print(data['path'],data['direction'],data['gt_image'].shape)

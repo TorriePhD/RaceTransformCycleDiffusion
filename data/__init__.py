@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data.distributed import DistributedSampler
 from torch import Generator, randperm
 from torch.utils.data import DataLoader, Subset
-
+from data.dataset import CustomBatchSampler
 import core.util as Util
 from core.praser import init_obj
 
@@ -18,17 +18,18 @@ def define_dataloader(logger, opt):
     phase_dataset, val_dataset = define_dataset(logger, opt)
 
     '''create datasampler'''
-    data_sampler = None
-    if opt['distributed']:
-        data_sampler = DistributedSampler(phase_dataset, shuffle=dataloader_args.get('shuffle', False), num_replicas=opt['world_size'], rank=opt['global_rank'])
-        dataloader_args.update({'shuffle':False}) # sampler option is mutually exclusive with shuffle 
-    
+    # data_sampler = None
+    # if opt['distributed']:
+    #     data_sampler = DistributedSampler(phase_dataset, shuffle=dataloader_args.get('shuffle', False), num_replicas=opt['world_size'], rank=opt['global_rank'])
+    #     dataloader_args.update({'shuffle':False}) # sampler option is mutually exclusive with shuffle 
+    data_sampler = CustomBatchSampler(phase_dataset, batch_size=dataloader_args.get('batch_size', 1) )
+    val_dataSampler = CustomBatchSampler(val_dataset, batch_size=dataloader_args.get('batch_size', 1) )
     ''' create dataloader and validation dataloader '''
     dataloader = DataLoader(phase_dataset, sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args)
     ''' val_dataloader don't use DistributedSampler to run only GPU 0! '''
     if opt['global_rank']==0 and val_dataset is not None:
         dataloader_args.update(opt['datasets'][opt['phase']]['dataloader'].get('val_args',{}))
-        val_dataloader = DataLoader(val_dataset, worker_init_fn=worker_init_fn, **dataloader_args) 
+        val_dataloader = DataLoader(val_dataset, sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args) 
     else:
         val_dataloader = None
     return dataloader, val_dataloader

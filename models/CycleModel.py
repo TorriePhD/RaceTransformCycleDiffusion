@@ -61,8 +61,6 @@ class Palette(BaseModel):
         ''' must use set_device in tensor '''
         self.cond_image = self.set_device(data.get('cond_image'))
         self.gt_image = self.set_device(data.get('gt_image'))
-        self.mask = self.set_device(data.get('mask'))
-        self.mask_image = data.get('mask_image')
         self.path = data['path']
         self.batch_size = len(data['path'])
         self.direction = data['direction']
@@ -72,11 +70,6 @@ class Palette(BaseModel):
             'gt_image': (self.gt_image.detach()[:].float().cpu()+1)/2,
             'cond_image': (self.cond_image.detach()[:].float().cpu()+1)/2,
         }
-        if self.task in ['inpainting','uncropping']:
-            dict.update({
-                'mask': self.mask.detach()[:].float().cpu(),
-                'mask_image': (self.mask_image+1)/2,
-            })
         if phase != 'train':
             dict.update({
                 'output': (self.output.detach()[:].float().cpu()+1)/2
@@ -112,9 +105,11 @@ class Palette(BaseModel):
             if self.direction == 'A':
                 _ = self.netG(self.gt_image, None, mask=None)
                 loss = self.netH(self.gt_image, self.cond_image, mask=None)
+                print(loss)
             else:
                 _ = self.netH(self.gt_image, None, mask=None)
                 loss = self.netG(self.gt_image, self.cond_image, mask=None)
+                print("loss B ", loss)
 
 
             loss.backward()

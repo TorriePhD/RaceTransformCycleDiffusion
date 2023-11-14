@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torchvision import models
 
 # class mse_loss(nn.Module):
 #     def __init__(self) -> None:
@@ -13,7 +14,13 @@ from torch.autograd import Variable
 
 def mse_loss(output, target):
     return F.mse_loss(output, target)
+def contrastive_loss(output, target):
+    output = output.squeeze()
+    target = target.squeeze()
 
+    euclidean_distance = F.pairwise_distance(output, target, keepdim = True)
+    loss_contrastive = torch.mean(torch.pow(euclidean_distance, 2))
+    return loss_contrastive
     
 class FocalLoss(nn.Module):
     def __init__(self, gamma=2, alpha=None, size_average=True):
@@ -46,3 +53,27 @@ class FocalLoss(nn.Module):
         if self.size_average: return loss.mean()
         else: return loss.sum()
 
+class RaceTransformCycleDiffusionLossModel(nn.Module):
+    def __init__(self,device='cuda'):
+        super().__init__()
+        resnet50 = models.resnet50(pretrained=True)
+        path = 'code/classes/RaceTransformCycleDiffusion/models/resnet50.pth'
+        # resnet50.load_state_dict(torch.load(path))
+        self.resnet50 = nn.Sequential(*list(resnet50.children())[:-1])
+        #freeze the resnet50
+        for param in self.resnet50.parameters():
+            param.requires_grad = False
+        self.resnet50.to(device)
+        
+    def forward(self, output, target):
+        outputEmbedding = self.resnet50(output)
+        targetEmbedding = self.resnet50(target)
+        print(f'outputEmbedding.shape: {outputEmbedding.shape},output.shape: {output.shape},targetEmbedding.shape: {targetEmbedding.shape},target.shape: {target.shape}')
+        loss = contrastive_loss(outputEmbedding, targetEmbedding)
+        print(f"contrastive_loss: {loss}")
+        return loss
+if __name__ == "__main__":
+    output = torch.randn(4, 2048, 1, 1)
+    target = torch.randn(4, 2048, 1, 1)
+
+    loss = contrastive_loss(output, target)

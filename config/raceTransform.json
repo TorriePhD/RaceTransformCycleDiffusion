@@ -19,10 +19,9 @@
             "which_dataset": {  // import designated dataset using arguments 
                 "name": ["data.dataset", "RaceTransformDataset"], // import Dataset() class / function(not recommend) from data.dataset.py (default is [data.dataset.py])
                 "args":{ // arguments to initialize dataset
-                    "data_root": "datasets/RaceTransformDataset/images",
-                    "data_flist": "datasets/RaceTransformDataset/flist/train.flist",
+                    "data_root": "/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImages",
                     "data_len": -1,
-                    "races" : ["White", "Black"]
+                    "races" : ["Caucasian", "African"]
                 } 
             },
             "dataloader":{
@@ -30,14 +29,12 @@
                 "args":{ // arguments to initialize train_dataloader
                     "batch_size": 4, // batch size in each gpu
                     "num_workers": 4,
-                    "shuffle": true,
                     "pin_memory": true,
                     "drop_last": true
                 },
                 "val_args":{ // arguments to initialize valid_dataloader, will overwrite the parameters in train_dataloader
                     "batch_size": 1, // batch size in each gpu
                     "num_workers": 4,
-                    "shuffle": false,
                     "pin_memory": true,
                     "drop_last": false
                 }
@@ -47,8 +44,8 @@
             "which_dataset": {
                 "name": "RaceTransformDataset", // import Dataset() class / function(not recommend) from default file
                 "args":{
-                    "data_root": "datasets/RaceTransformDataset/images",
-                    "data_flist": "datasets/RaceTransformDataset/flist/test.flist"
+                    "data_root": "/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImagesTest",
+                    "races" : ["Caucasian", "African"]
                 }
             },
             "dataloader":{

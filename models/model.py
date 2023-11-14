@@ -3,6 +3,7 @@ import tqdm
 from core.base_model import BaseModel
 from core.logger import LogTracker
 import copy
+from .loss import RaceTransformCycleDiffusionLossModel
 class EMA():
     def __init__(self, beta=0.9999):
         super().__init__()
@@ -24,6 +25,7 @@ class Palette(BaseModel):
         ''' networks, dataloder, optimizers, losses, etc. '''
         self.loss_fn = losses[0]
         self.netG = networks[0]
+        self.netH = networks[1]
         if ema_scheduler is not None:
             self.ema_scheduler = ema_scheduler
             self.netG_EMA = copy.deepcopy(self.netG)
@@ -44,9 +46,13 @@ class Palette(BaseModel):
         if self.opt['distributed']:
             self.netG.module.set_loss(self.loss_fn)
             self.netG.module.set_new_noise_schedule(phase=self.phase)
+            self.netH.module.set_loss(self.loss_fn)
+            self.netH.module.set_new_noise_schedule(phase=self.phase)
         else:
             self.netG.set_loss(self.loss_fn)
             self.netG.set_new_noise_schedule(phase=self.phase)
+            self.netH.set_loss(self.loss_fn)
+            self.netH.set_new_noise_schedule(phase=self.phase)
 
         ''' can rewrite in inherited class for more informations logging '''
         self.train_metrics = LogTracker(*[m.__name__ for m in losses], phase='train')
@@ -55,26 +61,24 @@ class Palette(BaseModel):
 
         self.sample_num = sample_num
         self.task = task
-        
+        self.perceptualLossModel = RaceTransformCycleDiffusionLossModel()
+    def perceptual_loss(self, x, y):
+        return self.perceptualLossModel(x, y)
     def set_input(self, data):
         ''' must use set_device in tensor '''
         self.cond_image = self.set_device(data.get('cond_image'))
         self.gt_image = self.set_device(data.get('gt_image'))
-        self.mask = self.set_device(data.get('mask'))
-        self.mask_image = data.get('mask_image')
+        self.gt_image_copy = self.set_device(data.get('gt_image'))
         self.path = data['path']
         self.batch_size = len(data['path'])
+        self.direction = data['direction']
+        print("direction ", self.direction)
     
     def get_current_visuals(self, phase='train'):
         dict = {
             'gt_image': (self.gt_image.detach()[:].float().cpu()+1)/2,
             'cond_image': (self.cond_image.detach()[:].float().cpu()+1)/2,
         }
-        if self.task in ['inpainting','uncropping']:
-            dict.update({
-                'mask': self.mask.detach()[:].float().cpu(),
-                'mask_image': (self.mask_image+1)/2,
-            })
         if phase != 'train':
             dict.update({
                 'output': (self.output.detach()[:].float().cpu()+1)/2
@@ -107,7 +111,18 @@ class Palette(BaseModel):
         for train_data in tqdm.tqdm(self.phase_loader):
             self.set_input(train_data)
             self.optG.zero_grad()
-            loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
+            if self.direction == 'B':
+                _ = self.netG(self.gt_image, None, mask=None)
+                loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
+                loss += self.netH(self.gt_image, self.cond_image, mask=None)
+                print(loss)
+            else:
+                _ = self.netH(self.gt_image, None, mask=None)
+                loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
+                loss += self.netG(self.gt_image, self.cond_image, mask=None)
+                print("loss B ", loss)
+
+
             loss.backward()
             self.optG.step()
 
