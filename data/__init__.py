@@ -32,10 +32,11 @@ def define_dataloader(logger, opt):
     dataloader_args.pop('drop_last', None)
     
     dataloader = DataLoader(phase_dataset, batch_sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args)
+
     ''' val_dataloader don't use DistributedSampler to run only GPU 0! '''
     if opt['global_rank']==0 and val_dataset is not None:
         dataloader_args.update(opt['datasets'][opt['phase']]['dataloader'].get('val_args',{}))
-        val_dataloader = DataLoader(val_dataset, batch_sampler=data_sampler, worker_init_fn=worker_init_fn, **dataloader_args) 
+        val_dataloader = DataLoader(val_dataset, batch_sampler=val_dataSampler, worker_init_fn=worker_init_fn, **dataloader_args) 
     else:
         val_dataloader = None
     return dataloader, val_dataloader
@@ -68,7 +69,6 @@ def define_dataset(logger, opt):
             valid_len = int(data_len * valid_split)
         data_len -= valid_len
         phase_dataset, val_dataset = subset_split(dataset=phase_dataset, lengths=[data_len, valid_len], generator=Generator().manual_seed(opt['seed']))
-    
     logger.info('Dataset for {} have {} samples.'.format(opt['phase'], data_len))
     if opt['phase'] == 'train':
         logger.info('Dataset for {} have {} samples.'.format('val', valid_len))   

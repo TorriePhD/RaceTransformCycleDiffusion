@@ -17,7 +17,7 @@ class BaseModel():
         self.phase = opt['phase']
         self.set_device = partial(Util.set_device, rank=opt['global_rank'])
 
-        ''' optimizers and schedulers '''
+        ''' optimizers and schedulrs '''
         self.schedulers = []
         self.optimizers = []
 

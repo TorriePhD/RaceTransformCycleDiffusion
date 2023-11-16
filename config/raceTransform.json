@@ -5,7 +5,7 @@
     "finetune_norm": false, // find the parameters to optimize
 
     "path": { //set every part file path
-        "base_dir": "experiments", // base path for all log except resume_state
+        "base_dir": "/fslgroup/grp_nlp/compute/RFW/results", // base path for all log except resume_state
         "code": "code", // code backup
         "tb_logger": "tb_logger", // path of tensorboard logger
         "results": "results",
@@ -25,17 +25,17 @@
                 } 
             },
             "dataloader":{
-                "validation_split": 2, // percent or number 
+                "validation_split": 0.2, // percent or number 
                 "args":{ // arguments to initialize train_dataloader
                     "batch_size": 4, // batch size in each gpu
-                    "num_workers": 4,
+                    "num_workers": 1,
                     // "shuffle": true,
                     "pin_memory": true,
                     "drop_last": true
                 },
                 "val_args":{ // arguments to initialize valid_dataloader, will overwrite the parameters in train_dataloader
                     "batch_size": 1, // batch size in each gpu
-                    "num_workers": 4,
+                    "num_workers": 1,
                     // "shuffle": false,
                     "pin_memory": true,
                     "drop_last": false
@@ -53,7 +53,7 @@
             "dataloader":{
                 "args":{
                     "batch_size": 8,
-                    "num_workers": 4,
+                    "num_workers": 1,
                     "pin_memory": true
                 }
             }
@@ -72,6 +72,7 @@
                     "ema_decay": 0.9999
                 },
                 "optimizers": [
+                    { "lr": 5e-5, "weight_decay": 0},
                     { "lr": 5e-5, "weight_decay": 0}
                 ]
             }

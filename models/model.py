@@ -29,18 +29,23 @@ class Palette(BaseModel):
         if ema_scheduler is not None:
             self.ema_scheduler = ema_scheduler
             self.netG_EMA = copy.deepcopy(self.netG)
+            self.netH_EMA = copy.deepcopy(self.netH)
             self.EMA = EMA(beta=self.ema_scheduler['ema_decay'])
         else:
             self.ema_scheduler = None
         
         ''' networks can be a list, and must convert by self.set_device function if using multiple GPU. '''
         self.netG = self.set_device(self.netG, distributed=self.opt['distributed'])
+        self.netH = self.set_device(self.netH, distributed=self.opt['distributed'])
         if self.ema_scheduler is not None:
             self.netG_EMA = self.set_device(self.netG_EMA, distributed=self.opt['distributed'])
+            self.netH_EMA = self.set_device(self.netH_EMA, distributed=self.opt['distributed'])
         self.load_networks()
 
         self.optG = torch.optim.Adam(list(filter(lambda p: p.requires_grad, self.netG.parameters())), **optimizers[0])
+        self.optH = torch.optim.Adam(list(filter(lambda p: p.requires_grad, self.netH.parameters())), **optimizers[1])
         self.optimizers.append(self.optG)
+        self.optimizers.append(self.optH)
         self.resume_training() 
 
         if self.opt['distributed']:
@@ -72,7 +77,6 @@ class Palette(BaseModel):
         self.path = data['path']
         self.batch_size = len(data['path'])
         self.direction = data['direction'][0]
-        print("direction ", self.direction)
     
     def get_current_visuals(self, phase='train'):
         dict = {
@@ -107,26 +111,27 @@ class Palette(BaseModel):
 
     def train_step(self):
         self.netG.train()
+        self.netH.train()
         self.train_metrics.reset()
         for train_data in tqdm.tqdm(self.phase_loader):
             self.set_input(train_data)
             self.optG.zero_grad()
+            self.optH.zero_grad()
             if self.direction == 'A':
                 _ = self.netG(self.gt_image, None, mask=None)
                 loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
                 loss += self.netH(self.gt_image, self.cond_image, mask=None)
                 loss +=self.perceptual_loss(self.gt_image,self.gt_image_copy, direction=1)
-                print(loss)
             else:
                 _ = self.netH(self.gt_image, None, mask=None)
                 loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
                 loss += self.netG(self.gt_image, self.cond_image, mask=None)
                 loss += self.perceptual_loss(self.gt_image,self.gt_image_copy, direction=1)
-                print("loss B ", loss)
 
 
             loss.backward()
             self.optG.step()
+            self.optH.step()
 
             self.iter += self.batch_size
             self.writer.set_iter(self.epoch, self.iter, phase='train')
@@ -140,6 +145,7 @@ class Palette(BaseModel):
             if self.ema_scheduler is not None:
                 if self.iter > self.ema_scheduler['ema_start'] and self.iter % self.ema_scheduler['ema_iter'] == 0:
                     self.EMA.update_model_average(self.netG_EMA, self.netG)
+                    self.EMA.update_model_average(self.netH_EMA, self.netH)
 
         for scheduler in self.schedulers:
             scheduler.step()
@@ -147,23 +153,16 @@ class Palette(BaseModel):
     
     def val_step(self):
         self.netG.eval()
+        self.netH.eval()
         self.val_metrics.reset()
         with torch.no_grad():
+            print(len(self.val_loader))
             for val_data in tqdm.tqdm(self.val_loader):
                 self.set_input(val_data)
-                if self.opt['distributed']:
-                    if self.task in ['inpainting','uncropping']:
-                        self.output, self.visuals = self.netG.module.restoration(self.cond_image, y_t=self.cond_image, 
-                            y_0=self.gt_image, mask=self.mask, sample_num=self.sample_num)
-                    else:
-                        self.output, self.visuals = self.netG.module.restoration(self.cond_image, sample_num=self.sample_num)
+                if self.direction == 'A':
+                    self.output, self.visuals = self.netG.restoration(self.cond_image, sample_num=self.sample_num)
                 else:
-                    if self.task in ['inpainting','uncropping']:
-                        self.output, self.visuals = self.netG.restoration(self.cond_image, y_t=self.cond_image, 
-                            y_0=self.gt_image, mask=self.mask, sample_num=self.sample_num)
-                    else:
-                        self.output, self.visuals = self.netG.restoration(self.cond_image, sample_num=self.sample_num)
-                    
+                    self.output, self.visuals = self.netH.restoration(self.cond_image, sample_num=self.sample_num)
                 self.iter += self.batch_size
                 self.writer.set_iter(self.epoch, self.iter, phase='val')
 
@@ -180,23 +179,15 @@ class Palette(BaseModel):
 
     def test(self):
         self.netG.eval()
+        self.netH.eval()
         self.test_metrics.reset()
         with torch.no_grad():
             for phase_data in tqdm.tqdm(self.phase_loader):
                 self.set_input(phase_data)
-                if self.opt['distributed']:
-                    if self.task in ['inpainting','uncropping']:
-                        self.output, self.visuals = self.netG.module.restoration(self.cond_image, y_t=self.cond_image, 
-                            y_0=self.gt_image, mask=self.mask, sample_num=self.sample_num)
-                    else:
-                        self.output, self.visuals = self.netG.module.restoration(self.cond_image, sample_num=self.sample_num)
+                if self.direction == 'A':
+                    self.output, self.visuals = self.netG.restoration(self.cond_image, sample_num=self.sample_num)
                 else:
-                    if self.task in ['inpainting','uncropping']:
-                        self.output, self.visuals = self.netG.restoration(self.cond_image, y_t=self.cond_image, 
-                            y_0=self.gt_image, mask=self.mask, sample_num=self.sample_num)
-                    else:
-                        self.output, self.visuals = self.netG.restoration(self.cond_image, sample_num=self.sample_num)
-                        
+                    self.output, self.visuals = self.netH.restoration(self.cond_image, sample_num=self.sample_num)
                 self.iter += self.batch_size
                 self.writer.set_iter(self.epoch, self.iter, phase='test')
                 for met in self.metrics:
@@ -219,20 +210,28 @@ class Palette(BaseModel):
     def load_networks(self):
         """ save pretrained model and training state, which only do on GPU 0. """
         if self.opt['distributed']:
-            netG_label = self.netG.module.__class__.__name__
+            netG_label = self.netG.module.__class__.__name__+"G"
+            netH_label = self.netH.module.__class__.__name__+"H"
         else:
-            netG_label = self.netG.__class__.__name__
+            netG_label = self.netG.__class__.__name__+"G"
+            netH_label = self.netH.__class__.__name__+"H"
         self.load_network(network=self.netG, network_label=netG_label, strict=False)
+        self.load_network(network=self.netH, network_label=netH_label, strict=False)
         if self.ema_scheduler is not None:
             self.load_network(network=self.netG_EMA, network_label=netG_label+'_ema', strict=False)
+            self.load_network(network=self.netH_EMA, network_label=netH_label+'_ema', strict=False)
 
     def save_everything(self):
         """ load pretrained model and training state. """
         if self.opt['distributed']:
-            netG_label = self.netG.module.__class__.__name__
+            netG_label = self.netG.module.__class__.__name__+"G"
+            netH_label = self.netH.module.__class__.__name__+"H"
         else:
-            netG_label = self.netG.__class__.__name__
+            netG_label = self.netG.__class__.__name__+"G"
+            netH_label = self.netH.__class__.__name__+"H"
         self.save_network(network=self.netG, network_label=netG_label)
+        self.save_network(network=self.netH, network_label=netH_label)
         if self.ema_scheduler is not None:
             self.save_network(network=self.netG_EMA, network_label=netG_label+'_ema')
+            self.save_network(network=self.netH_EMA, network_label=netH_label+'_ema')
         self.save_training_state()

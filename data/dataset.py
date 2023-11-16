@@ -4,8 +4,9 @@ from PIL import Image
 import os
 import torch
 import numpy as np
+from pathlib import Path
 
-from .util.mask import (bbox2mask, brush_stroke_mask, get_irregular_mask, random_bbox, random_cropping_bbox)
+# from .util.mask import (bbox2mask, brush_stroke_mask, get_irregular_mask, random_bbox, random_cropping_bbox)
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -15,7 +16,7 @@ IMG_EXTENSIONS = [
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
-def make_dataset(dir):
+def make_dataset(dir,excludeList=None):
     if os.path.isfile(dir):
         images = [i for i in np.genfromtxt(dir, dtype=np.str, encoding='utf-8')]
     else:
@@ -25,6 +26,10 @@ def make_dataset(dir):
             for fname in sorted(fnames):
                 if is_image_file(fname):
                     path = os.path.join(root, fname)
+                    user = fname.split("_")[:-1]
+                    user = "_".join(user)
+                    if excludeList is not None and user in excludeList:
+                        continue
                     images.append(path)
 
     return images
@@ -175,10 +180,25 @@ class ColorizationDataset(data.Dataset):
 
 
 class RaceTransformDataset(data.Dataset):
-   def __init__(self, data_root, mask_config={}, data_len=-1, image_size=[160, 160], loader=pil_loader,races=['African','Asian']):#,'Caucasian','Indian']):
+   def __init__(self, data_root, mask_config={}, data_len=-1, image_size=[160, 160], loader=pil_loader,races=["Caucasian", "African"]):#,'Caucasian','Indian']):
         imgs = []
+        testSet = np.load(Path(data_root).parent / "test.npy", allow_pickle=True).item()
+        valSet = np.load(Path(data_root).parent / "val.npy", allow_pickle=True).item()
+        trainSet = np.load(Path(data_root).parent / "train.npy", allow_pickle=True).item()
+        exxcludeList = []
+        oldDataRoot = data_root
         for i in races:
-            imgs += make_dataset(os.path.join(data_root,i))
+            testSetRace = testSet[i]
+            valSetRace = valSet[i]
+            trainSetRace = trainSet[i]
+            excludeSet = valSetRace
+            if oldDataRoot == "/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImages":
+                excludeSet = excludeSet
+            elif oldDataRoot == "/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImagesTest":
+                excludeSet = trainSet +testSetRace
+                data_root = "/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImages"
+
+            imgs += make_dataset(os.path.join(data_root,i),excludeSet)
         if data_len > 0:
             self.imgs = imgs[:int(data_len)]
         else:
@@ -247,6 +267,5 @@ class CustomBatchSampler(Sampler):
 
 
 if __name__=="__main__":
-    raceTransform = RaceTransformDataset("/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImages")
-    sampler = CustomBatchSampler(raceTransform, 32)
-    print(sampler[0])
+    raceTransform = RaceTransformDataset("/home/st392/fsl_groups/grp_nlp/compute/RFW/CroppedImagesTest")
+    print(len(raceTransform))

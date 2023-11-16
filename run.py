@@ -40,7 +40,7 @@ def main_worker(gpu, ngpus_per_node, opt):
     ''' set metrics, loss, optimizer and  schedulers '''
     metrics = [define_metric(phase_logger, item_opt) for item_opt in opt['model']['which_metrics']]
     losses = [define_loss(phase_logger, item_opt) for item_opt in opt['model']['which_losses']]
-
+    print(f"dataset size is {len(phase_loader.dataset)}, val size is {len(val_loader.dataset)}")
     model = create_model(
         opt = opt,
         networks = networks,
@@ -70,11 +70,17 @@ if __name__ == '__main__':
     parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
     parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-P', '--port', default='21012', type=str)
+    parser.add_argument('-l', '--learning_rate', default=None, type=float)
+
 
     ''' parser configs '''
     args = parser.parse_args()
     opt = Praser.parse(args)
-    
+    if opt['learning_rate'] is not None:
+        opt['model']['which_model']['args'][0]['lr'] = args.learning_rate
+        opt['model']['which_model']['args'][1]['lr'] = args.learning_rate
+        print(f"set learning rate to {args.learning_rate}")
+        
     ''' cuda devices '''
     gpu_str = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_str
