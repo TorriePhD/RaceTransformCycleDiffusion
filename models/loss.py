@@ -57,18 +57,19 @@ class FocalLoss(nn.Module):
 class RaceTransformCycleDiffusionLossModel(nn.Module):
     def __init__(self,device='cuda'):
         super().__init__()
-        resnet50 = models.resnet50(pretrained=True)
-        path = 'code/classes/RaceTransformCycleDiffusion/models/resnet50.pth'
-        # resnet50.load_state_dict(torch.load(path))
-        self.resnet50 = nn.Sequential(*list(resnet50.children())[:-1])
-        #freeze the resnet50
-        for param in self.resnet50.parameters():
+        resnet18 = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18')
+        path = '/home/st392/fsl_groups/grp_nlp/compute/RFW/models/20231121-131306_%f/model_9_88.18226722647567.pt'
+        resnet18.load_state_dict(torch.load(path))
+        self.resnet18 = nn.Sequential(*list(resnet18.children())[:-1])
+        #freeze the resnet18
+        for param in self.resnet18.parameters():
             param.requires_grad = False
-        self.resnet50.to(device)
+        self.resnet18.to(device)
         
     def forward(self, output, target, direction=0):
-        outputEmbedding = self.resnet50(output)
-        targetEmbedding = self.resnet50(target)
+        #print if ouput has gradient
+        outputEmbedding = self.resnet18(output)
+        targetEmbedding = self.resnet18(target)
         loss = contrastive_loss(outputEmbedding, targetEmbedding,direction=direction)
         return loss
 if __name__ == "__main__":
