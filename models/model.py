@@ -118,15 +118,18 @@ class Palette(BaseModel):
             self.optG.zero_grad()
             self.optH.zero_grad()
             if self.direction == 'A':
-                _ = self.netG(self.gt_image, None, mask=None)
-                loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
-                loss += self.netH(self.gt_image, self.cond_image, mask=None)
-                loss +=self.perceptual_loss(self.gt_image,self.gt_image_copy, direction=1)
+                self.gt_image.requires_grad = True
+                _,outImage = self.netG(self.gt_image, self.cond_image, mask=None)
+                loss = self.perceptual_loss(outImage,self.gt_image)
+                loss1,outImage2 = self.netH(outImage, self.cond_image, mask=None)
+                loss += loss1
+                loss +=self.perceptual_loss(outImage2,self.gt_image, direction=1)
             else:
-                _ = self.netH(self.gt_image, None, mask=None)
-                loss = self.perceptual_loss(self.gt_image,self.gt_image_copy)
-                loss += self.netG(self.gt_image, self.cond_image, mask=None)
-                loss += self.perceptual_loss(self.gt_image,self.gt_image_copy, direction=1)
+                _,outImage = self.netH(self.gt_image, self.cond_image, mask=None)
+                loss = self.perceptual_loss(outImage,self.gt_image)
+                loss1,outImage2 = self.netG(outImage, self.cond_image, mask=None)
+                loss += loss1
+                loss +=self.perceptual_loss(outImage2,self.gt_image, direction=1)
 
 
             loss.backward()

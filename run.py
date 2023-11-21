@@ -76,9 +76,9 @@ if __name__ == '__main__':
     ''' parser configs '''
     args = parser.parse_args()
     opt = Praser.parse(args)
-    if opt['learning_rate'] is not None:
-        opt['model']['which_model']['args'][0]['lr'] = args.learning_rate
-        opt['model']['which_model']['args'][1]['lr'] = args.learning_rate
+    if args.learning_rate is not None:
+        opt['model']['which_model']['args']['optimizers'][0]['lr'] = args.learning_rate
+        opt['model']['which_model']['args']['optimizers'][1]['lr'] = args.learning_rate
         print(f"set learning rate to {args.learning_rate}")
         
     ''' cuda devices '''

@@ -58,7 +58,7 @@ def mkdirs(paths):
             os.makedirs(path, exist_ok=True)
 
 def get_timestamp():
-    return datetime.now().strftime('%y%m%d_%H%M%S')
+    return datetime.now().strftime('%y%m%d_%H%M%S_%f')
 
 
 def write_json(content, fname):

@@ -121,7 +121,7 @@ class Network(BaseNetwork):
         elif y_cond is not None:
             noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy], dim=1), sample_gammas)
             loss = self.loss_fn(noise, noise_hat)
-        return loss
+        return loss, noise_hat
 
 
 # gaussian diffusion trainer class

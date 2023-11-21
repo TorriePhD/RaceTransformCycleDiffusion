@@ -25,7 +25,7 @@
                 } 
             },
             "dataloader":{
-                "validation_split": 0.2, // percent or number 
+                "validation_split": 0.01, // percent or number 
                 "args":{ // arguments to initialize train_dataloader
                     "batch_size": 4, // batch size in each gpu
                     "num_workers": 1,
