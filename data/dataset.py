@@ -208,8 +208,8 @@ class RaceTransformDataset(data.Dataset):
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5,0.5, 0.5])
         ])
-        self.images = [self.tfs(self.loader(i)) for i in self.imgs]
         self.loader = loader
+        self.images = [self.tfs(self.loader(i)) for i in self.imgs]
         self.image_size = image_size
         self.races = races
 

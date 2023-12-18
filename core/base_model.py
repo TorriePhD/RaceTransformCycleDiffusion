@@ -41,8 +41,8 @@ class BaseModel():
             if self.opt['distributed']:
                 ''' sets the epoch for this sampler. When :attr:`shuffle=True`, this ensures all replicas use a different random ordering for each epoch '''
                 self.phase_loader.sampler.set_epoch(self.epoch) 
-
-            train_log = self.train_step()
+            epochPercent = self.epoch/self.opt['train']['n_epoch']
+            train_log = self.train_step(epochPercent)
 
             ''' save logged informations into log dict ''' 
             train_log.update({'epoch': self.epoch, 'iters': self.iter})

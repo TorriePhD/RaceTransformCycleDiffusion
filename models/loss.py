@@ -14,6 +14,7 @@ from torchvision import models
 
 def mse_loss(output, target):
     return F.mse_loss(output, target)
+
 def contrastive_loss(output, target,direction=0):
     output = output.squeeze()
     target = target.squeeze()
@@ -58,13 +59,19 @@ class RaceTransformCycleDiffusionLossModel(nn.Module):
     def __init__(self,device='cuda'):
         super().__init__()
         resnet18 = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18')
-        path = '/home/st392/fsl_groups/grp_nlp/compute/RFW/models/20231121-131306_%f/model_9_88.18226722647567.pt'
-        resnet18.load_state_dict(torch.load(path))
+        resnet18.fc = torch.nn.Linear(512, 4)
+
+        path = '/home/st392/fsl_groups/grp_nlp/compute/RFW/models/20231121-131306_%f/model_5_88.84909854285009.pt'
+        state_dict = torch.load(path)
+        #remove the prefixe "model."
+        state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
+        resnet18.load_state_dict(state_dict)
         self.resnet18 = nn.Sequential(*list(resnet18.children())[:-1])
         #freeze the resnet18
         for param in self.resnet18.parameters():
             param.requires_grad = False
         self.resnet18.to(device)
+        self.resnet18.eval()
         
     def forward(self, output, target, direction=0):
         #print if ouput has gradient

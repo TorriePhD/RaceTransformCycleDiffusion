@@ -102,25 +102,36 @@ class Network(BaseNetwork):
                 ret_arr = torch.cat([ret_arr, y_t], dim=0)
         return y_t, ret_arr
 
-    def forward(self, y_0, y_cond=None, mask=None, noise=None):
+    def forward(self, y_0=None, y_cond=None, mask=None, noise=None):
         # sampling from p(gammas)
-        b, *_ = y_0.shape
-        t = torch.randint(1, self.num_timesteps, (b,), device=y_0.device).long()
+        if y_0 is None:
+            b, *_ = y_cond.shape
+        else:
+            b, *_ = y_0.shape
+        
+        t = torch.randint(1, self.num_timesteps, (b,), device=y_cond.device).long()
         gamma_t1 = extract(self.gammas, t-1, x_shape=(1, 1))
         sqrt_gamma_t2 = extract(self.gammas, t, x_shape=(1, 1))
-        sample_gammas = (sqrt_gamma_t2-gamma_t1) * torch.rand((b, 1), device=y_0.device) + gamma_t1
+        sample_gammas = (sqrt_gamma_t2-gamma_t1) * torch.rand((b, 1), device=y_cond.device) + gamma_t1
         sample_gammas = sample_gammas.view(b, -1)
 
-        noise = default(noise, lambda: torch.randn_like(y_0))
-        y_noisy = self.q_sample(
-            y_0=y_0, sample_gammas=sample_gammas.view(-1, 1, 1, 1), noise=noise)
+        noise = default(noise, lambda: torch.randn_like(y_cond))
+        if y_0 is not None:
+            y_noisy = self.q_sample(
+                y_0=y_0, sample_gammas=sample_gammas.view(-1, 1, 1, 1), noise=noise)
+        else:
+            y_noisy = None
         loss = None
-        if mask is not None:
+        if y_0 is None:
+            noise_hat = self.denoise_fn(torch.cat([y_cond,noise],dim=1), sample_gammas)
+            loss = self.loss_fn(noise, noise_hat)
+        elif mask is not None:
             noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy*mask+(1.-mask)*y_0], dim=1), sample_gammas)
             loss = self.loss_fn(mask*noise, mask*noise_hat)
         elif y_cond is not None:
             noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy], dim=1), sample_gammas)
-            loss = self.loss_fn(noise, noise_hat)
+            loss = self.loss_fn(y_0, noise_hat)
+        
         return loss, noise_hat
 
 
