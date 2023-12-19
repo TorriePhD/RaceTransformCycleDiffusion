@@ -109,7 +109,7 @@ class Palette(BaseModel):
         self.results_dict = self.results_dict._replace(name=ret_path, result=ret_result)
         return self.results_dict._asdict()
 
-    def train_step(self):
+    def train_step(self,epochpercent):
         self.netG.train()
         self.netH.train()
         self.train_metrics.reset()
@@ -119,17 +119,34 @@ class Palette(BaseModel):
             self.optH.zero_grad()
             if self.direction == 'A':
                 self.gt_image.requires_grad = True
-                _,outImage = self.netG(self.gt_image, self.cond_image, mask=None)
-                loss = self.perceptual_loss(outImage,self.gt_image)
-                loss1,outImage2 = self.netH(outImage, self.cond_image, mask=None)
+                gt_image = None
+                if epochpercent < 0.5:
+                    gt_image = self.gt_image
+                _,outImage = self.netG(gt_image, self.cond_image, mask=None)
+                loss = 0
+                if epochpercent > 0.5:
+                    loss += self.perceptual_loss(outImage,self.gt_image, direction=1)
+                loss1,outImage2 = self.netH(self.gt_image, outImage, mask=None)
                 loss += loss1
-                loss +=self.perceptual_loss(outImage2,self.gt_image, direction=1)
+                if epochpercent > 0.5:
+                    loss2 =self.perceptual_loss(outImage2,self.gt_image, direction=0)
+                    loss += loss2
             else:
-                _,outImage = self.netH(self.gt_image, self.cond_image, mask=None)
-                loss = self.perceptual_loss(outImage,self.gt_image)
-                loss1,outImage2 = self.netG(outImage, self.cond_image, mask=None)
+                self.gt_image.requires_grad = True
+                gt_image = None
+                if epochpercent < 0.5:
+                    gt_image = self.gt_image
+                _,outImage = self.netH(gt_image, self.cond_image, mask=None)
+                loss = 0
+                if epochpercent > 0.5:
+                    loss += self.perceptual_loss(outImage,self.gt_image, direction=1)
+
+                loss1,outImage2 = self.netG(self.gt_image, outImage, mask=None)
+
                 loss += loss1
-                loss +=self.perceptual_loss(outImage2,self.gt_image, direction=1)
+                if epochpercent > 0.5:
+                    loss2 =self.perceptual_loss(outImage2,self.gt_image, direction=0)
+                    loss += loss2
 
 
             loss.backward()
